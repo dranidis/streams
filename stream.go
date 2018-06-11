@@ -2,13 +2,17 @@ package main
 
 import (
 	"fmt"
+	"reflect"
+
 )
 
 type freal func(float64) float64
 type freal2 func(float64, float64) float64
+type flist func([]float64) float64
 type rchan chan float64
 type fchan func(rchan) rchan
 type fchan2 func(rchan, rchan) rchan
+type fchanlist func([]rchan) rchan
 
 func transfer(f freal) fchan {
 	return func(in rchan) rchan {
@@ -36,6 +40,35 @@ func transfer2(f freal2) fchan2 {
 					x1 = <-in1
 				}
 				out <- f(x1, x2)
+			}
+		}()
+		return out
+	}
+}
+
+func transferList(f flist) fchanlist {
+	return func(inl []rchan) rchan {
+		l := len(inl)
+		fmt.Println(l)
+		out := make(rchan)
+
+		vs := make([]float64, l)
+		go func() {
+			for {
+				cases := make([]reflect.SelectCase, l)
+				for i, ch := range inl {
+					cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
+				}
+
+				remaining := len(cases)
+				for remaining > 0 {
+					chosen, value, _ := reflect.Select(cases)
+					cases[chosen].Chan = reflect.ValueOf(nil)
+					remaining -= 1
+					fmt.Println(chosen, value)
+					vs[chosen] = value.Interface().(float64)
+				}
+				out <- f(vs)
 			}
 		}()
 		return out
@@ -133,4 +166,15 @@ func main() {
 	fmt.Println(<-out2)
 	fmt.Println(<-out2)
 
+	suml := func(l []float64) float64 {
+		var s float64 = 0.0
+		for _, r := range l {
+			s += r
+		}
+		return s
+	}
+
+	chanList := make([]rchan, 2)
+	//out3 :=
+	transferList(suml)(chanList)
 }

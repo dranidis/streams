@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"reflect"
-
 )
 
 type freal func(float64) float64
@@ -46,29 +45,33 @@ func transfer2(f freal2) fchan2 {
 	}
 }
 
+// read a value from each channel from a list of channels in any order.
+func readChannelList(inl []rchan) []float64 {
+	l := len(inl)
+	vs := make([]float64, l)
+	cases := make([]reflect.SelectCase, l)
+	for i, ch := range inl {
+		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
+	}
+
+	remaining := len(cases)
+	for remaining > 0 {
+		chosen, value, _ := reflect.Select(cases)
+		// set the value to nil so as not to read again from this channel
+		cases[chosen].Chan = reflect.ValueOf(nil)
+		remaining--
+		vs[chosen] = value.Interface().(float64)
+	}
+	return vs
+}
+
 func transferList(f flist) fchanlist {
 	return func(inl []rchan) rchan {
-		l := len(inl)
-		fmt.Println(l)
 		out := make(rchan)
 
-		vs := make([]float64, l)
 		go func() {
 			for {
-				cases := make([]reflect.SelectCase, l)
-				for i, ch := range inl {
-					cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
-				}
-
-				remaining := len(cases)
-				for remaining > 0 {
-					chosen, value, _ := reflect.Select(cases)
-					cases[chosen].Chan = reflect.ValueOf(nil)
-					remaining -= 1
-					fmt.Println(chosen, value)
-					vs[chosen] = value.Interface().(float64)
-				}
-				out <- f(vs)
+				out <- f(readChannelList(inl))
 			}
 		}()
 		return out
@@ -167,14 +170,16 @@ func main() {
 	fmt.Println(<-out2)
 
 	suml := func(l []float64) float64 {
-		var s float64 = 0.0
+		var s float64
 		for _, r := range l {
 			s += r
 		}
 		return s
 	}
 
-	chanList := make([]rchan, 2)
-	//out3 :=
-	transferList(suml)(chanList)
+	chanList := []rchan{in1, in2}
+	out3 := transferList(suml)(chanList)
+	fmt.Println(<-out3)
+	fmt.Println(<-out3)
+	fmt.Println(<-out3)
 }

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestTransferList(t *testing.T) {
@@ -12,7 +12,7 @@ func TestTransferList(t *testing.T) {
 	inL := []rchan{in1, in2}
 
 	suml := func(l []float64) float64 {
-		var s float64 = 0.0
+		var s float64
 		for _, r := range l {
 			s += r
 		}

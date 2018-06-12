@@ -5,10 +5,15 @@ import (
 	"reflect"
 )
 
-type freal func(float64) float64
-type freal2 func(float64, float64) float64
-type flist func([]float64) float64
-type rchan chan float64
+// this is the main type used in all stream processing functions
+// changing this will globally change the type of data
+type real float32
+
+
+type freal func(real) real
+type freal2 func(real, real) real
+type flist func([]real) real
+type rchan chan real
 type fchan func(rchan) rchan
 type fchan2 func(rchan, rchan) rchan
 type fchanlist func([]rchan) rchan
@@ -31,7 +36,7 @@ func transfer2(f freal2) fchan2 {
 		out := make(rchan)
 		go func() {
 			for {
-				var x1, x2 float64
+				var x1, x2 real
 				select {
 				case x1 = <-in1:
 					x2 = <-in2
@@ -45,10 +50,11 @@ func transfer2(f freal2) fchan2 {
 	}
 }
 
-// read a value from each channel from a list of channels in any order.
-func readChannelList(inl []rchan) []float64 {
+// read a single value from each channel from a list of channels
+// in any order.
+func readChannelList(inl []rchan) []real {
 	l := len(inl)
-	vs := make([]float64, l)
+	vs := make([]real, l)
 	cases := make([]reflect.SelectCase, l)
 	for i, ch := range inl {
 		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
@@ -60,7 +66,7 @@ func readChannelList(inl []rchan) []float64 {
 		// set the value to nil so as not to read again from this channel
 		cases[chosen].Chan = reflect.ValueOf(nil)
 		remaining--
-		vs[chosen] = value.Interface().(float64)
+		vs[chosen] = value.Interface().(real)
 	}
 	return vs
 }
@@ -78,7 +84,7 @@ func transferList(f flist) fchanlist {
 	}
 }
 
-func prefix(pre float64) fchan {
+func prefix(pre real) fchan {
 	return func(in rchan) rchan {
 		out := make(rchan)
 		go func() {
@@ -129,8 +135,8 @@ func recursion(f fchan) rchan {
 
 func main() {
 	in := make(rchan)
-	increase := func(x float64) float64 { return x + 1 }
-	add := func(x, y float64) float64 { return x + y }
+	increase := func(x real) real { return x + 1 }
+	add := func(x, y real) real { return x + y }
 
 	out := prefix(3.0)(transfer(increase)(in))
 
@@ -169,8 +175,8 @@ func main() {
 	fmt.Println(<-out2)
 	fmt.Println(<-out2)
 
-	suml := func(l []float64) float64 {
-		var s float64
+	suml := func(l []real) real {
+		var s real
 		for _, r := range l {
 			s += r
 		}

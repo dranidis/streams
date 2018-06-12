@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -11,8 +10,8 @@ func TestTransferList(t *testing.T) {
 	in2 := make(rchan)
 	inL := []rchan{in1, in2}
 
-	suml := func(l []float64) float64 {
-		var s float64
+	suml := func(l []real) real {
+		var s real
 		for _, r := range l {
 			s += r
 		}
@@ -26,8 +25,6 @@ func TestTransferList(t *testing.T) {
 
 	out := transferList(suml)(inL)
 	sum := <-out
-
-	fmt.Println(sum)
 
 	if sum != 3 {
 		t.Error("error")

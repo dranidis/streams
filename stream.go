@@ -8,32 +8,23 @@ import (
 // this is the main type used in all stream processing functions
 // changing this will globally change the type of data
 type real float32
+type stream chan real
 
-
-type freal func(real) real
-type freal2 func(real, real) real
-type flist func([]real) real
-type rchan chan real
-type fchan func(rchan) rchan
-type fchan2 func(rchan, rchan) rchan
-type fchanlist func([]rchan) rchan
-
-func transfer(f freal) fchan {
-	return func(in rchan) rchan {
-		out := make(rchan)
+func transfer(f func(real) real) func(stream) stream {
+	return func(in stream) stream {
+		out := make(stream)
 		go func() {
 			for {
-				x := <-in
-				out <- f(x)
+				out <- f(<-in)
 			}
 		}()
 		return out
 	}
 }
 
-func transfer2(f freal2) fchan2 {
-	return func(in1, in2 rchan) rchan {
-		out := make(rchan)
+func transfer2(f func(real, real) real) func(stream, stream) stream {
+	return func(in1, in2 stream) stream {
+		out := make(stream)
 		go func() {
 			for {
 				var x1, x2 real
@@ -52,7 +43,7 @@ func transfer2(f freal2) fchan2 {
 
 // read a single value from each channel from a list of channels
 // in any order.
-func readChannelList(inl []rchan) []real {
+func readChannelList(inl []stream) []real {
 	l := len(inl)
 	vs := make([]real, l)
 	cases := make([]reflect.SelectCase, l)
@@ -71,9 +62,9 @@ func readChannelList(inl []rchan) []real {
 	return vs
 }
 
-func transferList(f flist) fchanlist {
-	return func(inl []rchan) rchan {
-		out := make(rchan)
+func transferList(f func([]real) real) func([]stream) stream {
+	return func(inl []stream) stream {
+		out := make(stream)
 
 		go func() {
 			for {
@@ -84,23 +75,22 @@ func transferList(f flist) fchanlist {
 	}
 }
 
-func prefix(pre real) fchan {
-	return func(in rchan) rchan {
-		out := make(rchan)
+func prefix(pre real) func(stream) stream {
+	return func(in stream) stream {
+		out := make(stream)
 		go func() {
 			out <- pre
 			for {
-				x := <-in
-				out <- x
+				out <- <-in
 			}
 		}()
 		return out
 	}
 }
 
-func split(in rchan) (rchan, rchan) {
-	out1 := make(rchan)
-	out2 := make(rchan)
+func split(in stream) (stream, stream) {
+	out1 := make(stream)
+	out2 := make(stream)
 	go func() {
 		for {
 			x := <-in
@@ -116,17 +106,34 @@ func split(in rchan) (rchan, rchan) {
 
 }
 
-func connect(in rchan, out rchan) {
+func splitList(in stream, l int) []stream {
+	out := make([]stream, l)
+	for i := 0; i < l; i++ {
+		out[i] = make(stream)
+	}
 	go func() {
 		for {
 			x := <-in
-			out <- x
+			fmt.Println("READ X")
+			for i := 0; i < l; i++ {
+				out[i] <- x
+				fmt.Println("WRITE", i)
+			}
+		}
+	}()
+	return out
+}
+
+func connect(in stream, out stream) {
+	go func() {
+		for {
+			out <- <-in
 		}
 	}()
 }
 
-func recursion(f fchan) rchan {
-	in := make(rchan)
+func recursion(f func(stream) stream) stream {
+	in := make(stream)
 	out := f(in)
 	outS, feedback := split(out)
 	connect(feedback, in)
@@ -134,7 +141,7 @@ func recursion(f fchan) rchan {
 }
 
 func main() {
-	in := make(rchan)
+	in := make(stream)
 	increase := func(x real) real { return x + 1 }
 	add := func(x, y real) real { return x + y }
 
@@ -148,12 +155,12 @@ func main() {
 	fmt.Println(<-out)
 
 	nat := recursion(
-		func(c rchan) rchan {
+		func(c stream) stream {
 			return prefix(0.0)(transfer(increase)(c))
 		})
 
-	in1 := make(rchan)
-	in2 := make(rchan)
+	in1 := make(stream)
+	in2 := make(stream)
 	go func() {
 		for {
 			in1 <- 1.0
@@ -183,7 +190,7 @@ func main() {
 		return s
 	}
 
-	chanList := []rchan{in1, in2}
+	chanList := []stream{in1, in2}
 	out3 := transferList(suml)(chanList)
 	fmt.Println(<-out3)
 	fmt.Println(<-out3)

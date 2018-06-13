@@ -10,6 +10,36 @@ import (
 type real float32
 type stream chan real
 
+func constant(n real) stream {
+	out := make(stream)
+	go func() {
+		for {
+			out <- n
+		}
+	}()
+	return out
+}
+
+func natGenerator() stream {
+	increase := func(x real) real { return x + 1 }
+
+	return recursion(
+		func(c stream) stream {
+			return prefix(0.0)(transfer(increase)(c))
+		})
+}
+
+func pairwise(f func(real, real) real) func([]stream, []stream) []stream {
+	return func(a, b []stream) []stream {
+		l := len(a)
+		out := make([]stream, l)
+		for i := 0; i < l; i++ {
+			out[i] = transfer2(f)(a[i], b[i])
+		}
+		return out
+	}
+}
+
 func transfer(f func(real) real) func(stream) stream {
 	return func(in stream) stream {
 		out := make(stream)
@@ -106,7 +136,17 @@ func split(in stream) (stream, stream) {
 
 }
 
-func splitList(in stream, l int) []stream {
+func splitList(in []stream) ([]stream, []stream) {
+	l := len(in)
+	out1 := make([]stream, l)
+	out2 := make([]stream, l)
+	for i := 1; i < l; i++ {
+		out1[i], out2[i] = split(in[i])
+	}
+	return out1, out2
+}
+
+func splitListN(in stream, l int) []stream {
 	out := make([]stream, l)
 	for i := 0; i < l; i++ {
 		out[i] = make(stream)
@@ -114,10 +154,8 @@ func splitList(in stream, l int) []stream {
 	go func() {
 		for {
 			x := <-in
-			fmt.Println("READ X")
 			for i := 0; i < l; i++ {
 				out[i] <- x
-				fmt.Println("WRITE", i)
 			}
 		}
 	}()
@@ -130,6 +168,21 @@ func connect(in stream, out stream) {
 			out <- <-in
 		}
 	}()
+}
+
+func connectList(in []stream, out []stream) {
+	l := len(in)
+	for i := 1; i < l; i++ {
+		connect(in[i], out[i])
+	}
+}
+
+func recursionList(f func(stream) stream, l int) []stream {
+	out := make([]stream, l)
+	for i := 1; i < l; i++ {
+		out[i] = recursion(f)
+	}
+	return out
 }
 
 func recursion(f func(stream) stream) stream {

@@ -1,4 +1,4 @@
-package main
+package streams
 
 import (
 	"testing"
@@ -6,12 +6,12 @@ import (
 
 func TestTransferList(t *testing.T) {
 
-	in1 := make(stream)
-	in2 := make(stream)
-	inL := []stream{in1, in2}
+	in1 := make(Stream)
+	in2 := make(Stream)
+	inL := []Stream{in1, in2}
 
-	suml := func(l []real) real {
-		var s real
+	suml := func(l []Real) Real {
+		var s Real
 		for _, r := range l {
 			s += r
 		}
@@ -23,7 +23,7 @@ func TestTransferList(t *testing.T) {
 		in2 <- 2
 	}()
 
-	out := transferList(suml)(inL)
+	out := TransferList(suml)(inL)
 	sum := <-out
 
 	if sum != 3 {
@@ -45,7 +45,7 @@ func TestTransferList(t *testing.T) {
 }
 
 func TestSPlitList(t *testing.T) {
-	in := make(stream)
+	in := make(Stream)
 
 	go func() {
 		in <- 1
@@ -69,48 +69,34 @@ func TestSPlitList(t *testing.T) {
 }
 
 func TestNaturalNumbers(t *testing.T) {
-	increase := func(x real) real { return x + 1 }
-
-	nat := recursion(
-		func(c stream) stream {
-			return prefix(0.0)(transfer(increase)(c))
-		})
-
+	nat := NatGenerator(0.0)
 	zero := <-nat
 	if zero != 0 {
 		t.Error("Error nat")
 	}
-
 	one := <-nat
-
 	if one != 1 {
 		t.Error("Error nat")
 	}
-
 	for i := 1; i < 100; i++ {
 		num := <-nat
-		if num != one+real(i) {
+		if num != one+Real(i) {
 			t.Error("Error nat")
 		}
-
 	}
 }
 
 func TestFactorial1(t *testing.T) {
-
-	nat := natGenerator()
-	<-nat
-	in := make(stream)
-	f := prefix(1.0)(in)
-	out := transfer2(
-		func(x, y real) real {
+	nat := NatGenerator(1.0)
+	in := make(Stream)
+	f := Prefix(1.0)(in)
+	out := Transfer2(
+		func(x, y Real) Real {
 			return x * y
 		})(nat, f)
 	fact, out2 := split(out)
 	connect(out2, in)
-
-	fval := []real{1, 2, 6, 24, 120}
-
+	fval := []Real{1, 2, 6, 24, 120}
 	for i := 0; i < len(fval); i++ {
 		f := <-fact
 		if f != fval[i] {
@@ -120,19 +106,15 @@ func TestFactorial1(t *testing.T) {
 }
 
 func TestFactorial2(t *testing.T) {
-	nat := natGenerator()
-	<-nat
-
+	nat := NatGenerator(1.0)
 	factorial := recursion(
-		func(c stream) stream {
-			return transfer2(
-				func(x, y real) real {
+		func(c Stream) Stream {
+			return Transfer2(
+				func(x, y Real) Real {
 					return x * y
-				})(nat, prefix(1.0)(c))
+				})(nat, Prefix(1.0)(c))
 		})
-
-	fval := []real{1, 2, 6, 24, 120}
-
+	fval := []Real{1, 2, 6, 24, 120}
 	for i := 0; i < len(fval); i++ {
 		f := <-factorial
 		if f != fval[i] {
@@ -141,22 +123,20 @@ func TestFactorial2(t *testing.T) {
 	}
 }
 
-func TestNConstantNumbers(t *testing.T) {
-	zero := constant(0.0)
-
+func TestConstantNumbers(t *testing.T) {
+	zero := Constant(0.0)
 	for i := 1; i < 100; i++ {
 		num := <-zero
 		if num != 0.0 {
-			t.Error("Error constant")
+			t.Error("Error Constant")
 		}
-
 	}
 }
 
 func TestPairwiseMult(t *testing.T) {
 
-	a := []stream{constant(2.0), constant(5.0)}
-	b := []stream{constant(3.0), constant(6.0)}
+	a := []Stream{Constant(2.0), Constant(5.0)}
+	b := []Stream{Constant(3.0), Constant(6.0)}
 
 	n := <-a[0]
 
@@ -164,7 +144,7 @@ func TestPairwiseMult(t *testing.T) {
 		t.Error("Error pairwise")
 	}
 
-	mult := func(a, b real) real {
+	mult := func(a, b Real) Real {
 		return a * b
 	}
 	p := pairwise(mult)(a, b)
@@ -176,7 +156,7 @@ func TestPairwiseMult(t *testing.T) {
 	}
 
 	done := make(chan bool)
-	test := func(ind int, r real) {
+	test := func(ind int, r Real) {
 		for i := 1; i < 10; i++ {
 			num := <-p[ind]
 			if num != r {
